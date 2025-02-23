@@ -3,7 +3,7 @@ import subprocess
 import sys
 
 def install_dependencies():
-    dependencies = ["subfinder", "amass", "gobuster", "jq", "anew"]
+    dependencies = ["subfinder", "amass", "gobuster", "jq"]
     for dep in dependencies:
         if subprocess.run(["which", dep], capture_output=True).returncode != 0:
             print(f"[+] Installing {dep}...")
@@ -15,14 +15,6 @@ def install_dependencies():
                 os.environ["PATH"] += f":{go_path}/bin"
             else:
                 subprocess.run(["sudo", "apt", "install", "-y", dep], check=True)
-    
-    # Install anew manually (requires Go)
-    if subprocess.run(["which", "anew"], capture_output=True).returncode != 0:
-        print("[+] Installing anew...")
-        subprocess.run(["go", "install", "github.com/tomnomnom/anew@latest"], check=True)
-        # Add Go binary directory to PATH
-        go_path = subprocess.run(["go", "env", "GOPATH"], capture_output=True, text=True).stdout.strip()
-        os.environ["PATH"] += f":{go_path}/bin"
 
 def enumerate_subdomains(domain):
     # Create a directory with the domain name
@@ -52,7 +44,7 @@ def enumerate_subdomains(domain):
 
     # Combine all results into a unique final file (excluding amass.txt)
     print("[+] Generating final unique subdomains file...")
-    subprocess.run("cat subfinder.txt gobuster.txt crtsh.txt alienvault_subs.txt urlscan.txt webarchive_subs.txt | anew mixed_final.txt", shell=True, check=True)
+    subprocess.run("cat subfinder.txt gobuster.txt crtsh.txt alienvault_subs.txt urlscan.txt webarchive_subs.txt | sort -u > mixed_final.txt", shell=True, check=True)
 
     print("[+] Enumeration complete. Results saved in mixed_final.txt")
 
