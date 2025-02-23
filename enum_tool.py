@@ -31,24 +31,27 @@ def enumerate_subdomains(domain):
 
     print(f"[+] Enumerating subdomains for {domain}...")
 
+    # Define commands and their corresponding output files
     commands = [
-        ["subfinder", "-d", domain, "-o", "subfinder.txt"],
-        ["amass", "enum", "-active", "-norecursive", "-d", domain, "-o", "amass.txt"],
-        ["gobuster", "dns", "-d", domain, "-w", "/usr/share/wordlists/amass/subdomains-top1mil-110000.txt", "-o", "gobuster.txt"],
-        ["curl", "-s", f"https://crt.sh/?q=%.{domain}&output=json"],
-        ["curl", "-s", f"https://otx.alienvault.com/api/v1/indicators/hostname/{domain}/passive_dns"],
-        ["curl", "-s", f"https://urlscan.io/api/v1/search/?q=domain:{domain}&size=10000"],
-        ["curl", "-s", f"http://web.archive.org/cdx/search/cdx?url=*.{domain}/*&output=json&collapse=urlkey"]
+        (["subfinder", "-d", domain, "-o", "subfinder.txt"], None),
+        (["amass", "enum", "-active", "-norecursive", "-d", domain, "-o", "amass.txt"], None),
+        (["gobuster", "dns", "-d", domain, "-w", "/usr/share/wordlists/amass/subdomains-top1mil-110000.txt", "-o", "gobuster.txt"], None),
+        (["curl", "-s", f"https://crt.sh/?q=%.{domain}&output=json"], "crtsh.txt"),
+        (["curl", "-s", f"https://otx.alienvault.com/api/v1/indicators/hostname/{domain}/passive_dns"], "alienvault_subs.txt"),
+        (["curl", "-s", f"https://urlscan.io/api/v1/search/?q=domain:{domain}&size=10000"], "urlscan.txt"),
+        (["curl", "-s", f"http://web.archive.org/cdx/search/cdx?url=*.{domain}/*&output=json&collapse=urlkey"], "webarchive_subs.txt")
     ]
 
-    for cmd in commands:
+    for cmd, output_file in commands:
         print(f"[+] Running: {' '.join(cmd)}")
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            if cmd[0] == "curl":
-                output_file = f"{cmd[4].split('=')[1].split('&')[0]}.txt"
+            # Add a timeout of 10 minutes (600 seconds)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=600)
+            if output_file:
                 with open(output_file, "w") as f:
                     f.write(result.stdout)
+        except subprocess.TimeoutExpired:
+            print(f"[-] Command timed out: {' '.join(cmd)}")
         except subprocess.CalledProcessError as e:
             print(f"[-] Error running command: {' '.join(cmd)}")
             print(e.stderr)
