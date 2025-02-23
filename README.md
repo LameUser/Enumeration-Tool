@@ -9,7 +9,6 @@ This is an **advanced subdomain enumeration tool** that leverages multiple open-
 - **Automated Dependency Installation**: Ensures that all required tools are installed before execution.
 - **Multiple Enumeration Techniques**:
   - `subfinder` – Passive subdomain discovery
-  - `ShodanX` – Subdomain discovery using Shodan API
   - `amass` – Active enumeration and OSINT data collection
   - `gobuster` – DNS bruteforcing
   - `crt.sh` – Extracting subdomains from Certificate Transparency logs
@@ -27,8 +26,7 @@ Before running the tool, ensure that your system has **Python 3** installed.
 
 1. **Dependency Installation**  
    - Checks if the required tools (`subfinder`, `amass`, `gobuster`, `jq`, `anew`) are installed.  
-   - Installs missing dependencies using `apt`.  
-   - Clones and installs `ShodanX` in a virtual environment.  
+   - Installs missing dependencies using `apt`.   
 
 2. **Subdomain Enumeration**  
    - Runs various OSINT-based enumeration tools.  
@@ -44,7 +42,6 @@ The following tools are required and automatically installed:
 - [Gobuster](https://github.com/OJ/gobuster)
 - [jq](https://stedolan.github.io/jq/)
 - [Anew](https://github.com/tomnomnom/anew)
-- [ShodanX](https://github.com/RevoltSecurities/ShodanX) (installed in a virtual environment)
 
 ### Clone the Repository
 
@@ -66,7 +63,6 @@ All discovered subdomains are stored in the respective tool output files, and th
 ```
 [+] Enumerating subdomains for example.com...
 [+] Running: subfinder -d example.com -o subfinder.txt
-[+] Running: .venv/bin/shodanx subdomain -d example.com -ra -o shodanx.txt
 [+] Running: amass enum -active -norecursive -d example.com -o amass.txt
 [+] Running: gobuster dns -d example.com -w /usr/share/wordlists/amass/subdomains-top1mil-110000.txt -o gobuster.txt
 [+] Running: curl -s https://crt.sh/?q=%.example.com&output=json | jq -r '.[].name_value' | sort -u | tee crtsh.txt
