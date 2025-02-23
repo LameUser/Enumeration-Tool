@@ -24,18 +24,6 @@ def install_dependencies():
         go_path = subprocess.run(["go", "env", "GOPATH"], capture_output=True, text=True).stdout.strip()
         os.environ["PATH"] += f":{go_path}/bin"
 
-    # Install ShodanX in a virtual environment
-    if subprocess.run(["which", "shodanx"], capture_output=True).returncode != 0:
-        print("[+] Installing ShodanX in a virtual environment...")
-        os.makedirs(".venv", exist_ok=True)
-        subprocess.run(["python3", "-m", "venv", ".venv"], check=True)
-        subprocess.run([".venv/bin/python", "-m", "pip", "install", "--upgrade", "pip"], check=True)
-        subprocess.run(["git", "clone", "https://github.com/RevoltSecurities/ShodanX.git"], check=True)
-        os.chdir("ShodanX")
-        subprocess.run([".venv/bin/python", "-m", "pip", "install", "-r", "requirements.txt"], check=True)
-        subprocess.run([".venv/bin/python", "setup.py", "install"], check=True)
-        os.chdir("..")
-
 def enumerate_subdomains(domain):
     # Create a directory with the domain name
     os.makedirs(domain, exist_ok=True)
@@ -45,7 +33,6 @@ def enumerate_subdomains(domain):
 
     commands = [
         ["subfinder", "-d", domain, "-o", "subfinder.txt"],
-        [".venv/bin/shodanx", "subdomain", "-d", domain, "-ra", "-o", "shodanx.txt"],
         ["amass", "enum", "-active", "-norecursive", "-d", domain, "-o", "amass.txt"],
         ["gobuster", "dns", "-d", domain, "-w", "/usr/share/wordlists/amass/subdomains-top1mil-110000.txt", "-o", "gobuster.txt"],
         ["curl", "-s", f"https://crt.sh/?q=%.{domain}&output=json"],
