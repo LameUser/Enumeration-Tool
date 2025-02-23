@@ -1,21 +1,21 @@
 import os
 import subprocess
 import sys
-import platform
 
 def install_dependencies():
-    dependencies = ["subfinder", "amass", "gobuster", "jq"]
+    dependencies = ["subfinder", "amass", "gobuster", "jq", "anew"]
     for dep in dependencies:
         if subprocess.run(["which", dep], capture_output=True).returncode != 0:
             print(f"[+] Installing {dep}...")
-            if platform.system() == "Linux":
-                subprocess.run(["sudo", "apt", "install", "-y", dep], check=True)
-            elif platform.system() == "Darwin":  # macOS
-                subprocess.run(["brew", "install", dep], check=True)
+            if dep == "subfinder":
+                # Install subfinder using Go (to ensure the latest version)
+                subprocess.run(["go", "install", "github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"], check=True)
+                # Add Go binary directory to PATH
+                go_path = subprocess.run(["go", "env", "GOPATH"], capture_output=True, text=True).stdout.strip()
+                os.environ["PATH"] += f":{go_path}/bin"
             else:
-                print(f"[-] Unsupported OS for automatic installation of {dep}")
-                sys.exit(1)
-
+                subprocess.run(["sudo", "apt", "install", "-y", dep], check=True)
+    
     # Install anew manually (requires Go)
     if subprocess.run(["which", "anew"], capture_output=True).returncode != 0:
         print("[+] Installing anew...")
@@ -31,35 +31,28 @@ def enumerate_subdomains(domain):
 
     print(f"[+] Enumerating subdomains for {domain}...")
 
-    # Define commands and their corresponding output files
     commands = [
-        (["subfinder", "-d", domain, "-o", "subfinder.txt"], None),
-        (["amass", "enum", "-active", "-norecursive", "-d", domain, "-o", "amass.txt"], None),
-        (["gobuster", "dns", "-d", domain, "-w", "/usr/share/wordlists/amass/subdomains-top1mil-110000.txt", "-o", "gobuster.txt"], None),
-        (["curl", "-s", f"https://crt.sh/?q=%.{domain}&output=json"], "crtsh.txt"),
-        (["curl", "-s", f"https://otx.alienvault.com/api/v1/indicators/hostname/{domain}/passive_dns"], "alienvault_subs.txt"),
-        (["curl", "-s", f"https://urlscan.io/api/v1/search/?q=domain:{domain}&size=10000"], "urlscan.txt"),
-        (["curl", "-s", f"http://web.archive.org/cdx/search/cdx?url=*.{domain}/*&output=json&collapse=urlkey"], "webarchive_subs.txt")
+        f"subfinder -d {domain} -o subfinder.txt",
+        f"amass enum -active -norecursive -d {domain} -o amass.txt",
+        f"gobuster dns -d {domain} -w /usr/share/wordlists/amass/subdomains-top1mil-110000.txt -o gobuster.txt",
+        f"curl -s https://crt.sh/?q=%25.{domain}&output=json | jq -r '.[].name_value' | sort -u | tee crtsh.txt",
+        f"curl -s \"https://otx.alienvault.com/api/v1/indicators/hostname/{domain}/passive_dns\" | jq -r '.passive_dns[]?.hostname' | grep -E '^([a-zA-Z0-9.-]+\\.)?{domain}$' | sort -u | tee alienvault_subs.txt",
+        f"curl -s \"https://urlscan.io/api/v1/search/?q=domain:{domain}&size=10000\" | jq -r '.results[].page.domain' | grep -E '^([a-zA-Z0-9.-]+\\.)?{domain}$' | sort -u | tee urlscan.txt",
+        f"curl -s \"http://web.archive.org/cdx/search/cdx?url=*.{domain}/*&output=json&collapse=urlkey\" | jq -r '.[1:][] | .[2]' | grep -Eo '([a-zA-Z0-9-]+\\.)*{domain}' | sort -u | tee webarchive_subs.txt"
     ]
 
-    for cmd, output_file in commands:
-        print(f"[+] Running: {' '.join(cmd)}")
+    for cmd in commands:
+        print(f"[+] Running: {cmd}")
         try:
-            # Add a timeout of 10 minutes (600 seconds)
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=600)
-            if output_file:
-                with open(output_file, "w") as f:
-                    f.write(result.stdout)
-        except subprocess.TimeoutExpired:
-            print(f"[-] Command timed out: {' '.join(cmd)}")
+            subprocess.run(cmd, shell=True, check=True)
         except subprocess.CalledProcessError as e:
-            print(f"[-] Error running command: {' '.join(cmd)}")
+            print(f"[-] Error running command: {cmd}")
             print(e.stderr)
             continue
 
-    # Combine all results into a unique final file
+    # Combine all results into a unique final file (excluding amass.txt)
     print("[+] Generating final unique subdomains file...")
-    subprocess.run("cat *.txt | anew mixed_final.txt", shell=True, check=True)
+    subprocess.run("cat subfinder.txt gobuster.txt crtsh.txt alienvault_subs.txt urlscan.txt webarchive_subs.txt | anew mixed_final.txt", shell=True, check=True)
 
     print("[+] Enumeration complete. Results saved in mixed_final.txt")
 
