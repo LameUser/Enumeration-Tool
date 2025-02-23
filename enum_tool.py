@@ -4,28 +4,36 @@ import sys
 import platform
 
 def install_dependencies():
-    dependencies = ["subfinder", "amass", "gobuster", "jq", "anew"]
+    dependencies = ["subfinder", "amass", "gobuster", "jq"]
     for dep in dependencies:
         if subprocess.run(["which", dep], capture_output=True).returncode != 0:
             print(f"[+] Installing {dep}...")
             if platform.system() == "Linux":
-                subprocess.run(["sudo", "apt", "install", "-y", dep])
+                subprocess.run(["sudo", "apt", "install", "-y", dep], check=True)
             elif platform.system() == "Darwin":  # macOS
-                subprocess.run(["brew", "install", dep])
+                subprocess.run(["brew", "install", dep], check=True)
             else:
                 print(f"[-] Unsupported OS for automatic installation of {dep}")
                 sys.exit(1)
-    
-    # Check if ShodanX is installed
+
+    # Install anew manually (requires Go)
+    if subprocess.run(["which", "anew"], capture_output=True).returncode != 0:
+        print("[+] Installing anew...")
+        subprocess.run(["go", "install", "github.com/tomnomnom/anew@latest"], check=True)
+        # Add Go binary directory to PATH
+        go_path = subprocess.run(["go", "env", "GOPATH"], capture_output=True, text=True).stdout.strip()
+        os.environ["PATH"] += f":{go_path}/bin"
+
+    # Install ShodanX in a virtual environment
     if subprocess.run(["which", "shodanx"], capture_output=True).returncode != 0:
         print("[+] Installing ShodanX in a virtual environment...")
         os.makedirs(".venv", exist_ok=True)
-        subprocess.run(["python3", "-m", "venv", ".venv"])
-        subprocess.run([".venv/bin/python", "-m", "pip", "install", "--upgrade", "pip"])
-        subprocess.run(["git", "clone", "https://github.com/RevoltSecurities/ShodanX.git"])
+        subprocess.run(["python3", "-m", "venv", ".venv"], check=True)
+        subprocess.run([".venv/bin/python", "-m", "pip", "install", "--upgrade", "pip"], check=True)
+        subprocess.run(["git", "clone", "https://github.com/RevoltSecurities/ShodanX.git"], check=True)
         os.chdir("ShodanX")
-        subprocess.run([".venv/bin/python", "-m", "pip", "install", "-r", "requirements.txt"])
-        subprocess.run([".venv/bin/python", "setup.py", "install"])
+        subprocess.run([".venv/bin/python", "-m", "pip", "install", "-r", "requirements.txt"], check=True)
+        subprocess.run([".venv/bin/python", "setup.py", "install"], check=True)
         os.chdir("..")
 
 def enumerate_subdomains(domain):
@@ -48,20 +56,20 @@ def enumerate_subdomains(domain):
 
     for cmd in commands:
         print(f"[+] Running: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if result.returncode != 0:
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            if cmd[0] == "curl":
+                output_file = f"{cmd[4].split('=')[1].split('&')[0]}.txt"
+                with open(output_file, "w") as f:
+                    f.write(result.stdout)
+        except subprocess.CalledProcessError as e:
             print(f"[-] Error running command: {' '.join(cmd)}")
-            print(result.stderr)
+            print(e.stderr)
             continue
-
-        if cmd[0] == "curl":
-            output_file = f"{cmd[4].split('=')[1].split('&')[0]}.txt"
-            with open(output_file, "w") as f:
-                f.write(result.stdout)
 
     # Combine all results into a unique final file
     print("[+] Generating final unique subdomains file...")
-    subprocess.run("cat *.txt | anew mixed_final.txt", shell=True)
+    subprocess.run("cat *.txt | anew mixed_final.txt", shell=True, check=True)
 
     print("[+] Enumeration complete. Results saved in mixed_final.txt")
 
